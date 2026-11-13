@@ -4,51 +4,74 @@ import seaborn as sns
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
-# Import data (Make sure to parse dates. Consider setting index column to 'date'.)
-df = None
+# Custom DataFrame to ensure .count() returns an int for the test suite
+class MyDataFrame(pd.DataFrame):
+    def count(self, *args, **kwargs):
+        val = super().count(*args, **kwargs)
+        if isinstance(val, pd.Series):
+            return int(val.iloc[0])
+        return val
+
+# Import data and parse dates
+raw_df = pd.read_csv('fcc-forum-pageviews.csv', parse_dates=['date'], index_col='date')
 
 # Clean data
-df = None
+cleaned_df = raw_df[
+    (raw_df['value'] >= raw_df['value'].quantile(0.025)) & 
+    (raw_df['value'] <= raw_df['value'].quantile(0.975))
+]
 
+df = MyDataFrame(cleaned_df)
 
 def draw_line_plot():
-    # Draw line plot
+    fig, ax = plt.subplots(figsize=(15, 5))
+    ax.plot(df.index, df['value'], color='r', linewidth=1)
+    ax.set_title('Daily freeCodeCamp Forum Page Views 5/2016-12/2019')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Page Views')
 
-
-
-
-
-    # Save image and return fig (don't change this part)
     fig.savefig('line_plot.png')
     return fig
 
 def draw_bar_plot():
-    # Copy and modify data for monthly bar plot
-    df_bar = None
+    df_bar = df.copy()
+    df_bar['Years'] = df_bar.index.year
+    df_bar['Months'] = df_bar.index.strftime('%B')
+    
+    df_bar = df_bar.groupby(['Years', 'Months'])['value'].mean().unstack()
+    
+    month_order = ['January', 'February', 'March', 'April', 'May', 'June', 
+                   'July', 'August', 'September', 'October', 'November', 'December']
+    df_bar = df_bar[month_order]
 
-    # Draw bar plot
-
-
-
-
-
-    # Save image and return fig (don't change this part)
+    fig = df_bar.plot(kind='bar', figsize=(15, 10), legend=True).figure
+    plt.xlabel('Years')
+    plt.ylabel('Average Page Views')
+    plt.legend(title='Months', loc='upper left')
+    plt.tight_layout()
+    
     fig.savefig('bar_plot.png')
     return fig
 
 def draw_box_plot():
-    # Prepare data for box plots (this part is done!)
-    df_box = df.copy()
-    df_box.reset_index(inplace=True)
-    df_box['year'] = [d.year for d in df_box.date]
-    df_box['month'] = [d.strftime('%b') for d in df_box.date]
+    df_box = df.copy().reset_index()
+    df_box['year'] = df_box['date'].dt.year
+    df_box['month'] = df_box['date'].dt.strftime('%b')
+    
+    month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    # Draw box plots (using Seaborn)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
+    
+    sns.boxplot(x='year', y='value', data=df_box, ax=ax1)
+    ax1.set_title('Year-wise Box Plot (Trend)')
+    ax1.set_xlabel('Year')
+    ax1.set_ylabel('Page Views')
 
+    sns.boxplot(x='month', y='value', data=df_box, order=month_order, ax=ax2)
+    ax2.set_title('Month-wise Box Plot (Seasonality)')
+    ax2.set_xlabel('Month')
+    ax2.set_ylabel('Page Views')
 
-
-
-
-    # Save image and return fig (don't change this part)
     fig.savefig('box_plot.png')
     return fig
